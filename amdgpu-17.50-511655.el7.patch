@@ -1,0 +1,1108 @@
+diff -Nuarp amdgpu-17.50-511655.el7.orig/Makefile amdgpu-17.50-511655.el7/Makefile
+--- amdgpu-17.50-511655.el7.orig/Makefile	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/Makefile	2018-03-01 17:11:14.462119000 +0900
+@@ -14,6 +14,8 @@ OS_NAME = "rhel"
+ OS_VERSION = "$(shell sed -n -e 's/[^0-9]*\([0-9]*.[0-9]*\).*/\1/p' /etc/centos-release-upstream)"
+ endif
+ 
++OS_VERSION = "7,3"
++
+ ifeq ("ubuntu",$(OS_NAME))
+ subdir-ccflags-y += -DOS_NAME_UBUNTU
+ else ifeq ("rhel",$(OS_NAME))
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_amdkfd_gpuvm.c amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_amdkfd_gpuvm.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_amdkfd_gpuvm.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_amdkfd_gpuvm.c	2018-03-02 15:51:55.295680000 +0900
+@@ -607,7 +607,11 @@ static int init_user_pages(struct kgd_me
+ 
+ release_out:
+ 	if (ret)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++		release_pages(mem->user_pages, bo->tbo.ttm->num_pages);
++#else
+ 		release_pages(mem->user_pages, bo->tbo.ttm->num_pages, 0);
++#endif
+ free_out:
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+ 	drm_free_large(mem->user_pages);
+@@ -1198,8 +1202,11 @@ int amdgpu_amdkfd_gpuvm_free_memory_of_g
+ 	if (mem->user_pages) {
+ 		pr_debug("%s: Freeing user_pages array\n", __func__);
+ 		if (mem->user_pages[0])
+-			release_pages(mem->user_pages,
+-				      mem->bo->tbo.ttm->num_pages, 0);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++			release_pages(mem->user_pages, mem->bo->tbo.ttm->num_pages);
++#else
++			release_pages(mem->user_pages, mem->bo->tbo.ttm->num_pages, 0);
++#endif
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+ 		drm_free_large(mem->user_pages);
+ #else
+@@ -2019,8 +2026,11 @@ static int update_invalid_user_pages(str
+ 				return -ENOMEM;
+ 			}
+ 		} else if (mem->user_pages[0]) {
+-			release_pages(mem->user_pages,
+-				      bo->tbo.ttm->num_pages, 0);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++			release_pages(mem->user_pages, bo->tbo.ttm->num_pages);
++#else
++			release_pages(mem->user_pages, bo->tbo.ttm->num_pages, 0);
++#endif
+ 		}
+ 
+ 		/* Get updated user pages */
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_connectors.c amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_connectors.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_connectors.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_connectors.c	2018-03-01 17:20:43.540734000 +0900
+@@ -240,6 +240,9 @@ amdgpu_connector_update_scratch_regs(str
+ 			break;
+ 
+ 		encoder = drm_encoder_find(connector->dev,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++					NULL,
++#endif
+ 					connector->encoder_ids[i]);
+ 		if (!encoder)
+ 			continue;
+@@ -265,6 +268,9 @@ amdgpu_connector_find_encoder(struct drm
+ 		if (connector->encoder_ids[i] == 0)
+ 			break;
+ 		encoder = drm_encoder_find(connector->dev,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++					NULL,
++#endif
+ 					connector->encoder_ids[i]);
+ 		if (!encoder)
+ 			continue;
+@@ -380,7 +386,11 @@ amdgpu_connector_best_single_encoder(str
+ 
+ 	/* pick the encoder ids */
+ 	if (enc_id)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++		return drm_encoder_find(connector->dev, NULL, enc_id);
++#else
+ 		return drm_encoder_find(connector->dev, enc_id);
++#endif
+ 	return NULL;
+ }
+ 
+@@ -1091,7 +1101,11 @@ amdgpu_connector_dvi_detect(struct drm_c
+ 			if (connector->encoder_ids[i] == 0)
+ 				break;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++			encoder = drm_encoder_find(connector->dev, NULL, connector->encoder_ids[i]);
++#else
+ 			encoder = drm_encoder_find(connector->dev, connector->encoder_ids[i]);
++#endif
+ 			if (!encoder)
+ 				continue;
+ 
+@@ -1148,7 +1162,11 @@ amdgpu_connector_dvi_encoder(struct drm_
+ 		if (connector->encoder_ids[i] == 0)
+ 			break;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++		encoder = drm_encoder_find(connector->dev, NULL, connector->encoder_ids[i]);
++#else
+ 		encoder = drm_encoder_find(connector->dev, connector->encoder_ids[i]);
++#endif
+ 		if (!encoder)
+ 			continue;
+ 
+@@ -1167,7 +1185,11 @@ amdgpu_connector_dvi_encoder(struct drm_
+ 	/* then check use digitial */
+ 	/* pick the first one */
+ 	if (enc_id)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++		return drm_encoder_find(connector->dev, NULL, enc_id);
++#else
+ 		return drm_encoder_find(connector->dev, enc_id);
++#endif
+ 	return NULL;
+ }
+ 
+@@ -1310,8 +1332,11 @@ u16 amdgpu_connector_encoder_get_dp_brid
+ 		if (connector->encoder_ids[i] == 0)
+ 			break;
+ 
+-		encoder = drm_encoder_find(connector->dev,
+-					connector->encoder_ids[i]);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++		encoder = drm_encoder_find(connector->dev, NULL, connector->encoder_ids[i]);
++#else
++		encoder = drm_encoder_find(connector->dev, connector->encoder_ids[i]);
++#endif
+ 		if (!encoder)
+ 			continue;
+ 
+@@ -1339,8 +1364,11 @@ static bool amdgpu_connector_encoder_is_
+ 	for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
+ 		if (connector->encoder_ids[i] == 0)
+ 			break;
+-		encoder = drm_encoder_find(connector->dev,
+-					connector->encoder_ids[i]);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++		encoder = drm_encoder_find(connector->dev, NULL, connector->encoder_ids[i]);
++#else
++		encoder = drm_encoder_find(connector->dev, connector->encoder_ids[i]);
++#endif
+ 		if (!encoder)
+ 			continue;
+ 
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_cs.c amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_cs.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_cs.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_cs.c	2018-03-01 18:37:10.623347000 +0900
+@@ -572,8 +572,11 @@ static int amdgpu_cs_parser_bos(struct a
+ 				 * invalidated it. Free it and try again
+ 				 */
+ 				release_pages(e->user_pages,
+-					      bo->tbo.ttm->num_pages,
+-					      false);
++					      bo->tbo.ttm->num_pages
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
++					      ,false
++#endif
++				);
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+ 				drm_free_large(e->user_pages);
+ #else
+@@ -717,8 +720,11 @@ error_free_pages:
+ 				continue;
+ 
+ 			release_pages(e->user_pages,
+-				      e->robj->tbo.ttm->num_pages,
+-				      false);
++				      e->robj->tbo.ttm->num_pages
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
++				      ,false
++#endif
++			);
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 12, 0)
+ 			drm_free_large(e->user_pages);
+ #else
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_drv.c amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_drv.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_drv.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_drv.c	2018-03-01 17:13:18.494981000 +0900
+@@ -826,7 +826,9 @@ static struct drm_driver kms_driver = {
+ 	.open = amdgpu_driver_open_kms,
+ 	.postclose = amdgpu_driver_postclose_kms,
+ 	.lastclose = amdgpu_driver_lastclose_kms,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ 	.set_busid = drm_pci_set_busid,
++#endif
+ 	.unload = amdgpu_driver_unload_kms,
+ 	.get_vblank_counter = kcl_amdgpu_get_vblank_counter_kms,
+ 	.enable_vblank = kcl_amdgpu_enable_vblank_kms,
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_fb.c amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_fb.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_fb.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_fb.c	2018-03-01 18:12:46.611312000 +0900
+@@ -357,8 +357,10 @@ static void amdgpu_crtc_fb_gamma_get(str
+ }
+ 
+ static const struct drm_fb_helper_funcs amdgpu_fb_helper_funcs = {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ 	.gamma_set = amdgpu_crtc_fb_gamma_set,
+ 	.gamma_get = amdgpu_crtc_fb_gamma_get,
++#endif
+ 	.fb_probe = amdgpufb_create,
+ };
+ 
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_fence.c amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_fence.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_fence.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_fence.c	2018-03-01 18:09:49.472765000 +0900
+@@ -242,12 +242,19 @@ void amdgpu_fence_process(struct amdgpu_
+  *
+  * Checks for fence activity.
+  */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++static void amdgpu_fence_fallback(struct timer_list *t)
++{
++	struct amdgpu_ring *ring = from_timer(ring, t, fence_drv.fallback_timer);
++	amdgpu_fence_process(ring);
++}
++#else
+ static void amdgpu_fence_fallback(unsigned long arg)
+ {
+ 	struct amdgpu_ring *ring = (void *)arg;
+-
+ 	amdgpu_fence_process(ring);
+ }
++#endif
+ 
+ /**
+  * amdgpu_fence_wait_empty - wait for all fences to signal
+@@ -260,7 +267,11 @@ static void amdgpu_fence_fallback(unsign
+  */
+ int amdgpu_fence_wait_empty(struct amdgpu_ring *ring)
+ {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	uint64_t seq = READ_ONCE(ring->fence_drv.sync_seq);
++#else
+ 	uint64_t seq = ACCESS_ONCE(ring->fence_drv.sync_seq);
++#endif
+ 	struct dma_fence *fence, **ptr;
+ 	int r;
+ 
+@@ -300,7 +311,11 @@ unsigned amdgpu_fence_count_emitted(stru
+ 	amdgpu_fence_process(ring);
+ 	emitted = 0x100000000ull;
+ 	emitted -= atomic_read(&ring->fence_drv.last_seq);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	emitted += READ_ONCE(ring->fence_drv.sync_seq);
++#else
+ 	emitted += ACCESS_ONCE(ring->fence_drv.sync_seq);
++#endif
+ 	return lower_32_bits(emitted);
+ }
+ 
+@@ -372,8 +387,12 @@ int amdgpu_fence_driver_init_ring(struct
+ 	atomic_set(&ring->fence_drv.last_seq, 0);
+ 	ring->fence_drv.initialized = false;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	timer_setup(&ring->fence_drv.fallback_timer, amdgpu_fence_fallback, 0);
++#else
+ 	setup_timer(&ring->fence_drv.fallback_timer, amdgpu_fence_fallback,
+ 		    (unsigned long)ring);
++#endif
+ 
+ 	ring->fence_drv.num_fences_mask = num_hw_submission * 2 - 1;
+ 	spin_lock_init(&ring->fence_drv.lock);
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_gem.c amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_gem.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_gem.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_gem.c	2018-03-01 18:35:10.484731000 +0900
+@@ -470,7 +470,11 @@ int amdgpu_gem_userptr_ioctl(struct drm_
+ 	return 0;
+ 
+ free_pages:
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	release_pages(bo->tbo.ttm->pages, bo->tbo.ttm->num_pages);
++#else
+ 	release_pages(bo->tbo.ttm->pages, bo->tbo.ttm->num_pages, false);
++#endif
+ 
+ release_object:
+ 	kcl_drm_gem_object_put_unlocked(gobj);
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_irq.c amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_irq.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_irq.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_irq.c	2018-03-02 15:38:34.792215000 +0900
+@@ -277,7 +277,9 @@ void amdgpu_irq_fini(struct amdgpu_devic
+ {
+ 	unsigned i, j;
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ 	drm_vblank_cleanup(adev->ddev);
++#endif
+ 	if (adev->irq.installed) {
+ 		drm_irq_uninstall(adev->ddev);
+ 		adev->irq.installed = false;
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_mn.c amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_mn.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_mn.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_mn.c	2018-03-02 16:00:06.032096000 +0900
+@@ -53,7 +53,11 @@ struct amdgpu_mn {
+ 
+ 	/* objects protected by lock */
+ 	struct rw_semaphore	lock;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	struct rb_root_cached	objects;
++#else
+ 	struct rb_root		objects;
++#endif
+ 	struct mutex		read_lock;
+ 	atomic_t		recursion;
+ };
+@@ -80,8 +84,11 @@ static void amdgpu_mn_destroy(struct wor
+ 	mutex_lock(&adev->mn_lock);
+ 	down_write(&rmn->lock);
+ 	hash_del(&rmn->node);
+-	rbtree_postorder_for_each_entry_safe(node, next_node, &rmn->objects,
+-					     it.rb) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	rbtree_postorder_for_each_entry_safe(node, next_node, &rmn->objects.rb_root, it.rb) {
++#else
++	rbtree_postorder_for_each_entry_safe(node, next_node, &rmn->objects, it.rb) {
++#endif
+ 		list_for_each_entry_safe(bo, next_bo, &node->bos, mn_list) {
+ 			bo->mn = NULL;
+ 			list_del_init(&bo->mn_list);
+@@ -429,7 +436,11 @@ struct amdgpu_mn *amdgpu_mn_get(struct a
+ 	rmn->type = type;
+ 	rmn->mn.ops = &amdgpu_mn_ops[type];
+ 	init_rwsem(&rmn->lock);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	rmn->objects = RB_ROOT_CACHED;
++#else
+ 	rmn->objects = RB_ROOT;
++#endif
+ 	mutex_init(&rmn->read_lock);
+ 	atomic_set(&rmn->recursion, 0);
+ 
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_ttm.c amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_ttm.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_ttm.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_ttm.c	2018-03-01 18:11:29.562649000 +0900
+@@ -738,7 +738,11 @@ int amdgpu_ttm_tt_get_user_pages(struct
+ 	return 0;
+ 
+ release_pages:
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	release_pages(pages, pinned);
++#else
+ 	release_pages(pages, pinned, 0);
++#endif
+ 	up_read(&mm->mmap_sem);
+ 	return r;
+ }
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_ttm.h amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_ttm.h
+--- amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_ttm.h	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_ttm.h	2018-03-01 17:09:27.126800000 +0900
+@@ -24,7 +24,7 @@
+ #ifndef __AMDGPU_TTM_H__
+ #define __AMDGPU_TTM_H__
+ 
+-#include "gpu_scheduler.h"
++#include "../scheduler/gpu_scheduler.h"
+ 
+ #define AMDGPU_PL_GDS		(TTM_PL_PRIV + 0)
+ #define AMDGPU_PL_GWS		(TTM_PL_PRIV + 1)
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_vm.c amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_vm.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_vm.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_vm.c	2018-03-02 15:33:12.687596000 +0900
+@@ -32,6 +32,7 @@
+ #endif
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0)
+ #include <linux/interval_tree_generic.h>
++//#include "kcl/kcl_interval_tree_generic.h"
+ #endif
+ #include <drm/drmP.h>
+ #include <drm/amdgpu_drm.h>
+@@ -2588,7 +2589,11 @@ int amdgpu_vm_init(struct amdgpu_device
+ 	u64 flags;
+ 	uint64_t init_pde_value = 0;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	vm->va = RB_ROOT_CACHED;
++#else
+ 	vm->va = RB_ROOT;
++#endif
+ 	vm->client_id = atomic64_inc_return(&adev->vm_manager.client_counter);
+ 	for (i = 0; i < AMDGPU_MAX_VMHUBS; i++)
+ 		vm->reserved_vmid[i] = NULL;
+@@ -2752,10 +2757,20 @@ void amdgpu_vm_fini(struct amdgpu_device
+ 
+ 	amd_sched_entity_fini(vm->entity.sched, &vm->entity);
+ 
+-	if (!RB_EMPTY_ROOT(&vm->va)) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	if (!RB_EMPTY_ROOT(&vm->va.rb_root))
++#else
++	if (!RB_EMPTY_ROOT(&vm->va))
++#endif
++	{
+ 		dev_err(adev->dev, "still active bo inside vm\n");
+ 	}
+-	rbtree_postorder_for_each_entry_safe(mapping, tmp, &vm->va, rb) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	rbtree_postorder_for_each_entry_safe(mapping, tmp, &vm->va.rb_root, rb)
++#else
++	rbtree_postorder_for_each_entry_safe(mapping, tmp, &vm->va, rb)
++#endif
++	{
+ 		list_del(&mapping->list);
+ 		amdgpu_vm_it_remove(mapping, &vm->va);
+ 		kfree(mapping);
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_vm.h amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_vm.h
+--- amdgpu-17.50-511655.el7.orig/amd/amdgpu/amdgpu_vm.h	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdgpu/amdgpu_vm.h	2018-03-02 15:26:19.689861000 +0900
+@@ -121,7 +121,11 @@ struct amdgpu_vm_pt {
+ 
+ struct amdgpu_vm {
+ 	/* tree of virtual addresses mapped */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	struct rb_root_cached	va;
++#else
+ 	struct rb_root		va;
++#endif
+ 
+ 	/* protecting invalidated */
+ 	spinlock_t		status_lock;
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdgpu/dce_v10_0.c amdgpu-17.50-511655.el7/amd/amdgpu/dce_v10_0.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdgpu/dce_v10_0.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdgpu/dce_v10_0.c	2018-03-02 15:45:46.668225000 +0900
+@@ -1739,7 +1739,11 @@ static void dce_v10_0_afmt_setmode(struc
+ 	dce_v10_0_audio_write_sad_regs(encoder);
+ 	dce_v10_0_audio_write_latency_fields(encoder, mode);
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode, false);
++#else
+ 	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode);
++#endif
+ 	if (err < 0) {
+ 		DRM_ERROR("failed to setup AVI infoframe: %zd\n", err);
+ 		return;
+@@ -2754,7 +2758,9 @@ static const struct drm_crtc_helper_func
+ 	.mode_set_base_atomic = dce_v10_0_crtc_set_base_atomic,
+ 	.prepare = dce_v10_0_crtc_prepare,
+ 	.commit = dce_v10_0_crtc_commit,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ 	.load_lut = dce_v10_0_crtc_load_lut,
++#endif
+ 	.disable = dce_v10_0_crtc_disable,
+ };
+ 
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdgpu/dce_v11_0.c amdgpu-17.50-511655.el7/amd/amdgpu/dce_v11_0.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdgpu/dce_v11_0.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdgpu/dce_v11_0.c	2018-03-02 15:45:50.571403000 +0900
+@@ -1778,7 +1778,11 @@ static void dce_v11_0_afmt_setmode(struc
+ 	dce_v11_0_audio_write_sad_regs(encoder);
+ 	dce_v11_0_audio_write_latency_fields(encoder, mode);
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode, false);
++#else
+ 	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode);
++#endif
+ 	if (err < 0) {
+ 		DRM_ERROR("failed to setup AVI infoframe: %zd\n", err);
+ 		return;
+@@ -2857,7 +2861,9 @@ static const struct drm_crtc_helper_func
+ 	.mode_set_base_atomic = dce_v11_0_crtc_set_base_atomic,
+ 	.prepare = dce_v11_0_crtc_prepare,
+ 	.commit = dce_v11_0_crtc_commit,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ 	.load_lut = dce_v11_0_crtc_load_lut,
++#endif
+ 	.disable = dce_v11_0_crtc_disable,
+ };
+ 
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdgpu/dce_v6_0.c amdgpu-17.50-511655.el7/amd/amdgpu/dce_v6_0.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdgpu/dce_v6_0.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdgpu/dce_v6_0.c	2018-03-02 15:37:09.159741000 +0900
+@@ -1487,7 +1487,11 @@ static void dce_v6_0_audio_set_avi_infof
+ 	ssize_t err;
+ 	u32 tmp;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode, false);
++#else
+ 	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode);
++#endif
+ 	if (err < 0) {
+ 		DRM_ERROR("failed to setup AVI infoframe: %zd\n", err);
+ 		return;
+@@ -2640,7 +2644,9 @@ static const struct drm_crtc_helper_func
+ 	.mode_set_base_atomic = dce_v6_0_crtc_set_base_atomic,
+ 	.prepare = dce_v6_0_crtc_prepare,
+ 	.commit = dce_v6_0_crtc_commit,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ 	.load_lut = dce_v6_0_crtc_load_lut,
++#endif
+ 	.disable = dce_v6_0_crtc_disable,
+ };
+ 
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdgpu/dce_v8_0.c amdgpu-17.50-511655.el7/amd/amdgpu/dce_v8_0.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdgpu/dce_v8_0.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdgpu/dce_v8_0.c	2018-03-02 15:35:48.116987000 +0900
+@@ -1675,7 +1675,11 @@ static void dce_v8_0_afmt_setmode(struct
+ 	dce_v8_0_audio_write_sad_regs(encoder);
+ 	dce_v8_0_audio_write_latency_fields(encoder, mode);
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode, false);
++#else
+ 	err = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode);
++#endif
+ 	if (err < 0) {
+ 		DRM_ERROR("failed to setup AVI infoframe: %zd\n", err);
+ 		return;
+@@ -2665,7 +2669,9 @@ static const struct drm_crtc_helper_func
+ 	.mode_set_base_atomic = dce_v8_0_crtc_set_base_atomic,
+ 	.prepare = dce_v8_0_crtc_prepare,
+ 	.commit = dce_v8_0_crtc_commit,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ 	.load_lut = dce_v8_0_crtc_load_lut,
++#endif
+ 	.disable = dce_v8_0_crtc_disable,
+ };
+ 
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdgpu/dce_virtual.c amdgpu-17.50-511655.el7/amd/amdgpu/dce_virtual.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdgpu/dce_virtual.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdgpu/dce_virtual.c	2018-03-02 15:47:38.796946000 +0900
+@@ -278,7 +278,9 @@ static const struct drm_crtc_helper_func
+ 	.mode_set_base_atomic = dce_virtual_crtc_set_base_atomic,
+ 	.prepare = dce_virtual_crtc_prepare,
+ 	.commit = dce_virtual_crtc_commit,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ 	.load_lut = dce_virtual_crtc_load_lut,
++#endif
+ 	.disable = dce_virtual_crtc_disable,
+ };
+ 
+@@ -336,7 +338,11 @@ dce_virtual_encoder(struct drm_connector
+ 		if (connector->encoder_ids[i] == 0)
+ 			break;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++		encoder = drm_encoder_find(connector->dev, NULL, connector->encoder_ids[i]);
++#else
+ 		encoder = drm_encoder_find(connector->dev, connector->encoder_ids[i]);
++#endif
+ 		if (!encoder)
+ 			continue;
+ 
+@@ -346,7 +352,11 @@ dce_virtual_encoder(struct drm_connector
+ 
+ 	/* pick the first one */
+ 	if (enc_id)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++		return drm_encoder_find(connector->dev, NULL, enc_id);
++#else
+ 		return drm_encoder_find(connector->dev, enc_id);
++#endif
+ 	return NULL;
+ }
+ 
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdkcl/Makefile amdgpu-17.50-511655.el7/amd/amdkcl/Makefile
+--- amdgpu-17.50-511655.el7.orig/amd/amdkcl/Makefile	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdkcl/Makefile	2018-03-02 16:34:47.532962000 +0900
+@@ -1,6 +1,7 @@
+ LINUXINCLUDE := $(DKMS_INCLUDE_PREFIX) $(LINUXINCLUDE)
+ 
+-amdkcl-y += kcl_drm.o main.o symbols.o kcl_fence.o kcl_fence_array.o \
++#amdkcl-y += kcl_drm.o main.o symbols.o kcl_fence.o kcl_fence_array.o
++amdkcl-y += kcl_drm.o main.o kcl_fence.o kcl_fence_array.o \
+ 	kcl_kthread.o kcl_io.o kcl_mn.o kcl_reservation.o kcl_drm_global.o \
+ 	kcl_bitmap.o kcl_pci.o
+ 
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdkcl/kcl_drm.c amdgpu-17.50-511655.el7/amd/amdkcl/kcl_drm.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdkcl/kcl_drm.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdkcl/kcl_drm.c	2018-03-02 16:33:15.204973000 +0900
+@@ -262,7 +262,11 @@ _kcl_drm_atomic_helper_update_legacy_mod
+ 	int i;
+ 
+ 	/* clear out existing links and update dpms */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	for_each_old_connector_in_state(old_state, connector, old_conn_state, i) {
++#else
+ 	for_each_connector_in_state(old_state, connector, old_conn_state, i) {
++#endif
+ 		if (connector->encoder) {
+ 			WARN_ON(!connector->encoder->crtc);
+ 
+@@ -287,7 +291,11 @@ _kcl_drm_atomic_helper_update_legacy_mod
+ 	}
+ 
+ 	/* set new links */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	for_each_old_connector_in_state(old_state, connector, old_conn_state, i) {
++#else
+ 	for_each_connector_in_state(old_state, connector, old_conn_state, i) {
++#endif
+ 		if (!connector->state->crtc)
+ 			continue;
+ 
+@@ -299,7 +307,11 @@ _kcl_drm_atomic_helper_update_legacy_mod
+ 	}
+ 
+ 	/* set legacy state in the crtc structure */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	for_each_old_crtc_in_state(old_state, crtc, old_crtc_state, i) {
++#else
+ 	for_each_crtc_in_state(old_state, crtc, old_crtc_state, i) {
++#endif
+ 		struct drm_plane *primary = crtc->primary;
+ 
+ 		crtc->mode = crtc->state->mode;
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdkcl/kcl_fence.c amdgpu-17.50-511655.el7/amd/amdkcl/kcl_fence.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdkcl/kcl_fence.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdkcl/kcl_fence.c	2018-03-02 16:46:52.718343000 +0900
+@@ -21,6 +21,9 @@
+ #include <linux/slab.h>
+ #include <kcl/kcl_fence.h>
+ #include <kcl/kcl_rcupdate.h>
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++#include <linux/sched/signal.h>
++#endif
+ #include "kcl_common.h"
+ 
+ #define CREATE_TRACE_POINTS
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdkfd/kfd_peerdirect.c amdgpu-17.50-511655.el7/amd/amdkfd/kfd_peerdirect.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdkfd/kfd_peerdirect.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdkfd/kfd_peerdirect.c	2018-03-02 17:00:39.367205000 +0900
+@@ -174,7 +174,11 @@ static void free_callback(void *client_p
+ 	/* amdkfd will free resources when we return from this callback.
+ 	 * Set flag to inform that there is nothing to do on "put_pages", etc.
+ 	 */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	WRITE_ONCE(mem_context->free_callback_called, 1);
++#else
+ 	ACCESS_ONCE(mem_context->free_callback_called) = 1;
++#endif
+ }
+ 
+ 
+@@ -359,7 +363,11 @@ static void amd_put_pages(struct sg_tabl
+ 	pr_debug("mem_context->p2p_info %p\n",
+ 				mem_context->p2p_info);
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	if (READ_ONCE(mem_context->free_callback_called)) {
++#else
+ 	if (ACCESS_ONCE(mem_context->free_callback_called)) {
++#endif
+ 		pr_debug("Free callback was called\n");
+ 		return;
+ 	}
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdkfd/kfd_priv.h amdgpu-17.50-511655.el7/amd/amdkfd/kfd_priv.h
+--- amdgpu-17.50-511655.el7.orig/amd/amdkfd/kfd_priv.h	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdkfd/kfd_priv.h	2018-03-02 16:50:21.839040000 +0900
+@@ -726,7 +726,11 @@ struct kfd_process {
+ 	size_t signal_event_count;
+ 	bool signal_event_limit_reached;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	struct rb_root_cached bo_interval_tree;
++#else
+ 	struct rb_root bo_interval_tree;
++#endif
+ 
+ 	/* Information used for memory eviction */
+ 	void *process_info;
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/amdkfd/kfd_process.c amdgpu-17.50-511655.el7/amd/amdkfd/kfd_process.c
+--- amdgpu-17.50-511655.el7.orig/amd/amdkfd/kfd_process.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/amdkfd/kfd_process.c	2018-03-02 16:51:39.203194000 +0900
+@@ -584,7 +584,11 @@ static struct kfd_process *create_proces
+ 	if (!process)
+ 		goto err_alloc_process;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	process->bo_interval_tree = RB_ROOT_CACHED;
++#else
+ 	process->bo_interval_tree = RB_ROOT;
++#endif
+ 
+ 	process->pasid = kfd_pasid_alloc();
+ 	if (process->pasid == 0)
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/display/amdgpu_dm/amdgpu_dm.c amdgpu-17.50-511655.el7/amd/display/amdgpu_dm/amdgpu_dm.c
+--- amdgpu-17.50-511655.el7.orig/amd/display/amdgpu_dm/amdgpu_dm.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/display/amdgpu_dm/amdgpu_dm.c	2018-03-02 16:27:18.955304000 +0900
+@@ -244,7 +244,11 @@ static void dm_pflip_high_irq(void *inte
+ 	/* wakeup usersapce */
+ 	if (amdgpu_crtc->event) {
+ 		/* Update to correct count/ts if racing with vblank irq */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++		drm_crtc_accurate_vblank_count(&amdgpu_crtc->base);
++#else
+ 		drm_accurate_vblank_count(&amdgpu_crtc->base);
++#endif
+ 
+ 		drm_crtc_send_vblank_event(&amdgpu_crtc->base, amdgpu_crtc->event);
+ 
+@@ -583,11 +587,11 @@ struct amdgpu_dm_connector *amdgpu_dm_fi
+ 	struct drm_connector *connector;
+ 	struct drm_crtc *crtc_from_state;
+ 
+-	for_each_connector_in_state(
+-		state,
+-		connector,
+-		conn_state,
+-		i) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	for_each_new_connector_in_state(state, connector, conn_state, i) {
++#else
++	for_each_connector_in_state(state, connector, conn_state, i) {
++#endif
+ 		crtc_from_state =
+ 			from_state_var ?
+ 				conn_state->crtc :
+@@ -2685,7 +2689,9 @@ static const struct drm_crtc_funcs amdgp
+ 	.destroy = amdgpu_dm_crtc_destroy,
+ 	.gamma_set = drm_atomic_helper_legacy_gamma_set,
+ 	.set_config = drm_atomic_helper_set_config,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ 	.set_property = drm_atomic_helper_crtc_set_property,
++#endif
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+ 	.page_flip = amdgpu_atomic_helper_page_flip,
+ #else
+@@ -2955,11 +2961,15 @@ struct drm_connector_state *amdgpu_dm_co
+ }
+ 
+ static const struct drm_connector_funcs amdgpu_dm_connector_funcs = {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ 	.dpms = drm_atomic_helper_connector_dpms,
++#endif
+ 	.reset = amdgpu_dm_connector_funcs_reset,
+ 	.detect = amdgpu_dm_connector_detect,
+ 	.fill_modes = drm_helper_probe_single_connector_modes,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ 	.set_property = drm_atomic_helper_connector_set_property,
++#endif
+ 	.destroy = amdgpu_dm_connector_destroy,
+ 	.atomic_duplicate_state = amdgpu_dm_connector_atomic_duplicate_state,
+ 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+@@ -2977,7 +2987,11 @@ static struct drm_encoder *best_encoder(
+ 
+ 	/* pick the encoder ids */
+ 	if (enc_id) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++		obj = drm_mode_object_find(connector->dev, NULL, enc_id, DRM_MODE_OBJECT_ENCODER);
++#else
+ 		obj = drm_mode_object_find(connector->dev, enc_id, DRM_MODE_OBJECT_ENCODER);
++#endif
+ 		if (!obj) {
+ 			DRM_ERROR("Couldn't find a matching encoder for our connector\n");
+ 			return NULL;
+@@ -3222,7 +3236,9 @@ static const struct drm_plane_funcs dm_p
+ 	.update_plane	= drm_atomic_helper_update_plane,
+ 	.disable_plane	= drm_atomic_helper_disable_plane,
+ 	.destroy	= drm_plane_cleanup,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ 	.set_property	= drm_atomic_helper_plane_set_property,
++#endif
+ 	.reset = dm_drm_plane_reset,
+ 	.atomic_duplicate_state = dm_drm_plane_duplicate_state,
+ 	.atomic_destroy_state = dm_drm_plane_destroy_state,
+@@ -4244,7 +4260,7 @@ static void amdgpu_dm_commit_planes(stru
+ {
+ 	uint32_t i;
+ 	struct drm_plane *plane;
+-	struct drm_plane_state *old_plane_state;
++	struct drm_plane_state *old_plane_state/*, *new_plane_state*/;
+ 	struct dc_stream_state *dc_stream_attach;
+ 	struct dc_plane_state *plane_states_constructed[MAX_SURFACES];
+ 	struct amdgpu_crtc *acrtc_attach = to_amdgpu_crtc(pcrtc);
+@@ -4253,7 +4269,11 @@ static void amdgpu_dm_commit_planes(stru
+ 	unsigned long flags;
+ 
+ 	/* update planes when needed */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	for_each_old_plane_in_state(state, plane, old_plane_state/*, new_plane_state*/, i) {
++#else
+ 	for_each_plane_in_state(state, plane, old_plane_state, i) {
++#endif
+ 		struct drm_plane_state *plane_state = plane->state;
+ 		struct drm_crtc *crtc = plane_state->crtc;
+ 		struct drm_framebuffer *fb = plane_state->fb;
+@@ -4346,7 +4366,6 @@ int amdgpu_dm_atomic_commit(
+ 		bool nonblock)
+ {
+ 	struct drm_crtc *crtc;
+-	struct drm_crtc_state *new_state;
+ 	struct amdgpu_device *adev = dev->dev_private;
+ 	int i;
+ 
+@@ -4357,6 +4376,17 @@ int amdgpu_dm_atomic_commit(
+ 	 * it will update crtc->dm_crtc_state->stream pointer which is used in
+ 	 * the ISRs.
+ 	 */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	struct drm_crtc_state *old_crtc_state, *new_crtc_state;
++	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
++		struct dm_crtc_state *dm_old_crtc_state = to_dm_crtc_state(old_crtc_state);
++		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
++
++		if (drm_atomic_crtc_needs_modeset(new_crtc_state) && dm_old_crtc_state->stream)
++			manage_dm_interrupts(adev, acrtc, false);
++	}
++#else
++	struct drm_crtc_state *new_state;
+ 	for_each_crtc_in_state(state, crtc, new_state, i) {
+ 		struct dm_crtc_state *old_acrtc_state = to_dm_crtc_state(crtc->state);
+ 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+@@ -4364,6 +4394,7 @@ int amdgpu_dm_atomic_commit(
+ 		if (drm_atomic_crtc_needs_modeset(new_state) && old_acrtc_state->stream)
+ 			manage_dm_interrupts(adev, acrtc, false);
+ 	}
++#endif
+ 
+ 	return drm_atomic_helper_commit(dev, state, nonblock);
+ 
+@@ -4394,7 +4425,11 @@ void amdgpu_dm_atomic_commit_tail(
+ 	dm_state = to_dm_atomic_state(state);
+ 
+ 	/* update changed items */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	for_each_old_crtc_in_state(state, crtc, old_crtc_state/*, new_crtc_state*/, i) {
++#else
+ 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
++#endif
+ 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+ 		struct drm_crtc_state *new_state = crtc->state;
+ 
+@@ -4523,7 +4558,11 @@ void amdgpu_dm_atomic_commit_tail(
+ 	}
+ 
+ 	/* Handle scaling and undersacn changes*/
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	for_each_old_connector_in_state(state, connector, old_conn_state/*, new_con_state*/, i) {
++#else
+ 	for_each_connector_in_state(state, connector, old_conn_state, i) {
++#endif
+ 		struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
+ 		struct dm_connector_state *con_new_state =
+ 				to_dm_connector_state(aconnector->base.state);
+@@ -4577,7 +4616,17 @@ void amdgpu_dm_atomic_commit_tail(
+ 	}
+ 
+ 	/* update planes when needed per crtc*/
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	for_each_old_crtc_in_state(state, pcrtc, old_crtc_state, j) {
++	/*for_each_new_crtc_in_state(state, pcrtc, new_crtc_state, j) {
++		new_acrtc_state = to_dm_crtc_state(new_crtc_state);
++
++		if (new_acrtc_state->stream)
++			amdgpu_dm_commit_planes(state, dev, dm, pcrtc, &wait_for_vblank);
++	}*/
++#else
+ 	for_each_crtc_in_state(state, pcrtc, old_crtc_state, j) {
++#endif
+ 		new_acrtc_state = to_dm_crtc_state(pcrtc->state);
+ 
+ 		if (new_acrtc_state->stream)
+@@ -4590,7 +4639,11 @@ void amdgpu_dm_atomic_commit_tail(
+ 	 * mark consumed event for drm_atomic_helper_commit_hw_done
+ 	 */
+ 	spin_lock_irqsave(&adev->ddev->event_lock, flags);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	for_each_old_crtc_in_state(state, crtc, old_crtc_state, i) {
++#else
+ 	for_each_crtc_in_state(state, crtc, old_crtc_state, i) {
++#endif
+ 		struct amdgpu_crtc *acrtc = to_amdgpu_crtc(crtc);
+ 
+ 		if (acrtc->base.state->event)
+@@ -4868,7 +4921,11 @@ int amdgpu_dm_atomic_check(struct drm_de
+ 
+ 	/*TODO Move this code into dm_crtc_atomic_check once we get rid of dc_validation_set */
+ 	/* update changed items */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	for_each_new_crtc_in_state(state, crtc, crtc_state, i) {
++#else
+ 	for_each_crtc_in_state(state, crtc, crtc_state, i) {
++#endif
+ 		struct amdgpu_crtc *acrtc = NULL;
+ 		struct amdgpu_dm_connector *aconnector = NULL;
+ 		struct dc_stream_state *new_stream = NULL;
+@@ -4988,7 +5045,11 @@ int amdgpu_dm_atomic_check(struct drm_de
+ 	 * new stream into context w\o causing full reset. Need to
+ 	 * decide how to handle.
+ 	 */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	for_each_new_connector_in_state(state, connector, conn_state, i) {
++#else
+ 	for_each_connector_in_state(state, connector, conn_state, i) {
++#endif
+ 		struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
+ 		struct dm_connector_state *con_old_state =
+ 				to_dm_connector_state(aconnector->base.state);
+@@ -5007,10 +5068,18 @@ int amdgpu_dm_atomic_check(struct drm_de
+ 		lock_and_validation_needed = true;
+ 	}
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	for_each_new_crtc_in_state(state, crtc, crtc_state, i) {
++#else
+ 	for_each_crtc_in_state(state, crtc, crtc_state, i) {
++#endif
+ 		new_acrtc_state = to_dm_crtc_state(crtc_state);
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++		for_each_new_plane_in_state(state, plane, plane_state, j) {
++#else
+ 		for_each_plane_in_state(state, plane, plane_state, j) {
++#endif
+ 			struct drm_crtc *plane_crtc = plane_state->crtc;
+ 			struct drm_framebuffer *fb = plane_state->fb;
+ 			bool pflip_needed;
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/display/amdgpu_dm/amdgpu_dm_mst_types.c amdgpu-17.50-511655.el7/amd/display/amdgpu_dm/amdgpu_dm_mst_types.c
+--- amdgpu-17.50-511655.el7.orig/amd/display/amdgpu_dm/amdgpu_dm_mst_types.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/display/amdgpu_dm/amdgpu_dm_mst_types.c	2018-03-02 16:28:09.313128000 +0900
+@@ -164,12 +164,16 @@ dm_dp_mst_connector_destroy(struct drm_c
+ }
+ 
+ static const struct drm_connector_funcs dm_dp_mst_connector_funcs = {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ 	.dpms = drm_atomic_helper_connector_dpms,
++#endif
+ 	.detect = dm_dp_mst_detect,
+ 	.fill_modes = drm_helper_probe_single_connector_modes,
+ 	.destroy = dm_dp_mst_connector_destroy,
+ 	.reset = amdgpu_dm_connector_funcs_reset,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ 	.set_property = drm_atomic_helper_connector_set_property,
++#endif
+ 	.atomic_duplicate_state = amdgpu_dm_connector_atomic_duplicate_state,
+ 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+ 	.atomic_set_property = amdgpu_dm_connector_atomic_set_property,
+diff -Nuarp amdgpu-17.50-511655.el7.orig/amd/scheduler/gpu_scheduler.c amdgpu-17.50-511655.el7/amd/scheduler/gpu_scheduler.c
+--- amdgpu-17.50-511655.el7.orig/amd/scheduler/gpu_scheduler.c	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/amd/scheduler/gpu_scheduler.c	2018-03-02 15:54:10.705841000 +0900
+@@ -189,7 +189,11 @@ static bool amd_sched_entity_is_ready(st
+ 	if (kfifo_is_empty(&entity->job_queue))
+ 		return false;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
++	if (READ_ONCE(entity->dependency))
++#else
+ 	if (ACCESS_ONCE(entity->dependency))
++#endif
+ 		return false;
+ 
+ 	return true;
+diff -Nuarp amdgpu-17.50-511655.el7.orig/include/drm/spsc_queue.h amdgpu-17.50-511655.el7/include/drm/spsc_queue.h
+--- amdgpu-17.50-511655.el7.orig/include/drm/spsc_queue.h	1970-01-01 09:00:00.000000000 +0900
++++ amdgpu-17.50-511655.el7/include/drm/spsc_queue.h	2018-02-08 05:43:08.000000000 +0900
+@@ -0,0 +1,122 @@
++/*
++ * Copyright 2017 Advanced Micro Devices, Inc.
++ *
++ * Permission is hereby granted, free of charge, to any person obtaining a
++ * copy of this software and associated documentation files (the "Software"),
++ * to deal in the Software without restriction, including without limitation
++ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
++ * and/or sell copies of the Software, and to permit persons to whom the
++ * Software is furnished to do so, subject to the following conditions:
++ *
++ * The above copyright notice and this permission notice shall be included in
++ * all copies or substantial portions of the Software.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
++ * THE COPYRIGHT HOLDER(S) OR AUTHOR(S) BE LIABLE FOR ANY CLAIM, DAMAGES OR
++ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
++ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ * OTHER DEALINGS IN THE SOFTWARE.
++ *
++ */
++
++#ifndef DRM_SCHEDULER_SPSC_QUEUE_H_
++#define DRM_SCHEDULER_SPSC_QUEUE_H_
++
++#include <linux/atomic.h>
++#include <linux/preempt.h>
++
++/** SPSC lockless queue */
++
++struct spsc_node {
++
++	/* Stores spsc_node* */
++	struct spsc_node *next;
++};
++
++struct spsc_queue {
++
++	 struct spsc_node *head;
++
++	/* atomic pointer to struct spsc_node* */
++	atomic_long_t tail;
++
++	atomic_t job_count;
++};
++
++static inline void spsc_queue_init(struct spsc_queue *queue)
++{
++	queue->head = NULL;
++	atomic_long_set(&queue->tail, (long)&queue->head);
++	atomic_set(&queue->job_count, 0);
++}
++
++static inline struct spsc_node *spsc_queue_peek(struct spsc_queue *queue)
++{
++	return queue->head;
++}
++
++static inline int spsc_queue_count(struct spsc_queue *queue)
++{
++	return atomic_read(&queue->job_count);
++}
++
++static inline bool spsc_queue_push(struct spsc_queue *queue, struct spsc_node *node)
++{
++	struct spsc_node **tail;
++
++	node->next = NULL;
++
++	preempt_disable();
++
++	tail = (struct spsc_node **)atomic_long_xchg(&queue->tail, (long)&node->next);
++	WRITE_ONCE(*tail, node);
++	atomic_inc(&queue->job_count);
++
++	/*
++	 * In case of first element verify new node will be visible to the consumer
++	 * thread when we ping the kernel thread that there is new work to do.
++	 */
++	smp_wmb();
++
++	preempt_enable();
++
++	return tail == &queue->head;
++}
++
++
++static inline struct spsc_node *spsc_queue_pop(struct spsc_queue *queue)
++{
++	struct spsc_node *next, *node;
++
++	/* Verify reading from memory and not the cache */
++	smp_rmb();
++
++	node = READ_ONCE(queue->head);
++
++	if (!node)
++		return NULL;
++
++	next = READ_ONCE(node->next);
++	WRITE_ONCE(queue->head, next);
++
++	if (unlikely(!next)) {
++		/* slowpath for the last element in the queue */
++
++		if (atomic_long_cmpxchg(&queue->tail,
++				(long)&node->next, (long) &queue->head) != (long)&node->next) {
++			/* Updating tail failed wait for new next to appear */
++			do {
++				smp_rmb();
++			} while (unlikely(!(queue->head = READ_ONCE(node->next))));
++		}
++	}
++
++	atomic_dec(&queue->job_count);
++	return node;
++}
++
++
++
++#endif /* DRM_SCHEDULER_SPSC_QUEUE_H_ */
+diff -Nuarp amdgpu-17.50-511655.el7.orig/include/kcl/kcl_drm.h amdgpu-17.50-511655.el7/include/kcl/kcl_drm.h
+--- amdgpu-17.50-511655.el7.orig/include/kcl/kcl_drm.h	2017-12-02 06:30:56.000000000 +0900
++++ amdgpu-17.50-511655.el7/include/kcl/kcl_drm.h	2018-03-01 17:04:05.398406000 +0900
+@@ -277,7 +277,10 @@ static inline int kcl_drm_universal_plan
+ 			     enum drm_plane_type type,
+ 			     const char *name, ...)
+ {
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
++		return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
++				 formats, format_count, 0, type, name);
++#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0) || \
+ 		defined(OS_NAME_RHEL_7_3) || \
+ 		defined(OS_NAME_RHEL_7_4)
+ 		return drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
+@@ -330,7 +333,11 @@ static inline int
+ kcl_drm_calc_vbltimestamp_from_scanoutpos(struct drm_device *dev,
+ 					  unsigned int pipe,
+ 					  int *max_error,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ 					  struct timeval *vblank_time,
++#else
++					  ktime_t *vblank_time,
++#endif
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
+ 					  unsigned flags,
+ #else
