@@ -1326,13 +1326,13 @@ static enum bp_result get_embedded_panel_info_v2_1(
 	info->lcd_timing.misc_info.VERTICAL_CUT_OFF = 0;
 
 	info->lcd_timing.misc_info.H_REPLICATION_BY2 =
-		lvds->lcd_timing.miscinfo & ATOM_H_REPLICATIONBY2;
+		!!(lvds->lcd_timing.miscinfo & ATOM_H_REPLICATIONBY2);
 	info->lcd_timing.misc_info.V_REPLICATION_BY2 =
-		lvds->lcd_timing.miscinfo & ATOM_V_REPLICATIONBY2;
+		!!(lvds->lcd_timing.miscinfo & ATOM_V_REPLICATIONBY2);
 	info->lcd_timing.misc_info.COMPOSITE_SYNC =
-		lvds->lcd_timing.miscinfo & ATOM_COMPOSITESYNC;
+		!!(lvds->lcd_timing.miscinfo & ATOM_COMPOSITESYNC);
 	info->lcd_timing.misc_info.INTERLACE =
-		lvds->lcd_timing.miscinfo & ATOM_INTERLACE;
+		!!(lvds->lcd_timing.miscinfo & ATOM_INTERLACE);
 
 	/* not provided by VBIOS*/
 	info->lcd_timing.misc_info.DOUBLE_CLOCK = 0;
